@@ -13,42 +13,42 @@ class TestTelemetrySchedule():
 
     device_id = ''
 
-    # def test_WHEN_get_real_telemetry_EXPECTED_status_code_is_200(self, app, telemetry):
-    #     device_id = random.choice(app.rest.rest_get(app, route=app.route.dev_list)['data'])
-    #     app.env.params['deviceId'] = device_id['deviceId']
-    #     app.env.params['type'] = telemetry
-    #
-    #     resp = app.rest.rest_get(app, route=app.route.real_telemetry)
-    #     assert resp['status_code'] == 200
-    #
-    # def test_WHEN_get_history_telemetry_EXPECTED_status_code_is_200(self, app, telemetry):
-    #     dates = app.string.get_random_start_end_dates_unix()
-    #     device = random.choice(app.rest.rest_get(app, route=app.route.dev_list)['data'])
-    #     app.env.params['deviceId'] = device['deviceId']
-    #     app.env.params['type'] = telemetry
-    #     app.env.params['from'] = dates['start_date']
-    #     app.env.params['to'] = time.time()
-    #     app.env.params['addr'] = app.data_help.get_real_addr_from_one_device(device)
-    #
-    #     resp = app.rest.rest_get(app, route=app.route.history_telemetry)
-    #     assert resp['status_code'] == 200
-    #
-    # def test_WHEN_get_list_cellular_EXPECTED_response_code_400(self, app):
-    #     app.env.params['page'] = random.randint(1, 50)
-    #     app.env.params['number'] = random.randint(1, 50)
-    #     resp = app.rest.rest_get(app, route=app.route.list_cell)
-    #     assert resp['status_code'] == 400
-    #
-    # def test_WHEN_get_cellular_profile_EXPECTED_response_code_400(self, app):
-    #     resp = app.rest.rest_get(app, route=app.route.list_cell_prof)
-    #     assert resp['status_code'] == 400
-    #
-    # def test_WHEN_get_list_enrollments_EXPECTED_respose_code_400(self, app):
-    #     app.env.params['page'] = random.randint(1, 50)
-    #     app.env.params['number'] = random.randint(1, 50)
-    #
-    #     resp = app.rest.rest_get(app, route=app.route.list_enroll)
-    #     assert resp['status_code'] == 400
+    def test_WHEN_get_real_telemetry_EXPECTED_status_code_is_200(self, app, telemetry):
+        device_id = random.choice(app.rest.rest_get(app, route=app.route.dev_list)['data'])
+        app.env.params['deviceId'] = device_id['deviceId']
+        app.env.params['type'] = telemetry
+
+        resp = app.rest.rest_get(app, route=app.route.real_telemetry)
+        assert resp['status_code'] == 200
+
+    def test_WHEN_get_history_telemetry_EXPECTED_status_code_is_200(self, app, telemetry):
+        dates = app.string.get_random_start_end_dates_unix()
+        device = random.choice(app.rest.rest_get(app, route=app.route.dev_list)['data'])
+        app.env.params['deviceId'] = device['deviceId']
+        app.env.params['type'] = telemetry
+        app.env.params['from'] = dates['start_date']
+        app.env.params['to'] = time.time()
+        app.env.params['addr'] = app.data_help.get_real_addr_from_one_device(device)
+
+        resp = app.rest.rest_get(app, route=app.route.history_telemetry)
+        assert resp['status_code'] == 200
+
+    def test_WHEN_get_list_cellular_EXPECTED_response_code_400(self, app):
+        app.env.params['page'] = random.randint(1, 50)
+        app.env.params['number'] = random.randint(1, 50)
+        resp = app.rest.rest_get(app, route=app.route.list_cell)
+        assert resp['status_code'] == 400
+
+    def test_WHEN_get_cellular_profile_EXPECTED_response_code_400(self, app):
+        resp = app.rest.rest_get(app, route=app.route.list_cell_prof)
+        assert resp['status_code'] == 400
+
+    def test_WHEN_get_list_enrollments_EXPECTED_respose_code_400(self, app):
+        app.env.params['page'] = random.randint(1, 50)
+        app.env.params['number'] = random.randint(1, 50)
+
+        resp = app.rest.rest_get(app, route=app.route.list_enroll)
+        assert resp['status_code'] == 400
 
     def test_WHEN_post_schedule_EXPECTED_response_code_200(self, app, target):
         app.env.params['target'] = target
