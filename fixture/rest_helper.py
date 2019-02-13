@@ -6,111 +6,66 @@ import json
 class Rest:
 
     def rest_get(self, app, route=None, url=None):
-        if url == None:
+        tr_data = self.get_transformed_data(app, route, data=None)
+        if url:
+            tr_data['url'] = url
+        response = self.get_response_rest(app, tr_data, "GET")
 
-            url = str(app.env.base_url) + str(route)
-        else:
-            url = url
-
-        response = requests.request(
-            "GET",
-            url,
-            headers=app.env.headers,
-            params=app.env.params,
-            cookies=app.env.cookies,
-            verify=False)
-        try:
-            responce_j = json.loads(response.text)
-            if type(responce_j) == list:
-                responce_j = {'data': responce_j}
-
-            responce_j['status_code'] = response.status_code
-
-            return responce_j
-
-        except:
-            print(str(response))
+        json_response = self.get_parsed_response_data(app, tr_data, response)
+        return json_response
 
     def rest_post(self, app, route, data):
+        tr_data = self.get_transformed_data(app, route, data)
+        response = self.get_response_rest(app, tr_data, "POST")
+
+        json_response = self.get_parsed_response_data(app, tr_data, response)
+
+        return json_response
+
+    def rest_put(self, app, route, data):
+        tr_data = self.get_transformed_data(app, route, data)
+        response = self.get_response_rest(app, tr_data, "PUT")
+
+        json_response = self.get_parsed_response_data(app, tr_data, response)
+
+        return json_response
+
+    def rest_delete(self, app, route, data=None):
+        tr_data = self.get_transformed_data(app, route, data)
+        response = self.get_response_rest(app, tr_data, "DELETE")
+
+        json_response = self.get_parsed_response_data(app, tr_data, response)
+
+        return json_response
+
+    def get_parsed_response_data(self, app, tr_data, response):
+        if response.status_code != 200:
+            self.print_resp_data(app, response, tr_data)
+
+        if response.text == "":
+            return {'data': response.text, 'status_code': response.status_code}
+
+        try:
+            responce_j = {'data': json.loads(response.text), 'status_code': response.status_code}
+
+            return responce_j
+        except:
+            print("_____________________________ERROR_JSON_LOADS_______________________________")
+            print(response.text)
+
+    def print_resp_data(self, app, response, tr_data):
+        print('STATUS CODE = {}  \n/ TEXT = {}  \n/ URL = {}  \n/ PARAMS = {}  \n/ DATA = {}'
+              .format(response.status_code, response.text, tr_data['url'], str(app.env.params), str(tr_data['data'])))
+
+    def get_transformed_data(self, app, route, data):
         url = str(app.env.base_url) + str(route)
         if data is None:
             data = {}
         if app.env.headers:
             data = json.dumps(data)
+        return {'data': data, 'url': url}
 
-        responce = requests.request(
-            "POST",
-            url,
-            data=data,
-            headers=app.env.headers,
-            cookies=app.env.cookies,
-            params=app.env.params)
-        if responce.status_code != 200:
-            print('STATUS CODE = {}  \n/ TEXT = {}  \n/ URL = {}  \n/ PARAMS = {}  \n/ DATA = {}'
-                  .format(responce.status_code, responce.text, url, str(app.env.params), str(data)))
-        elif responce.text == "":
-
-            responce_j = {'data': responce.text, 'status_code': responce.status_code}
-            return responce_j
-        try:
-
-            responce_j = json.loads(responce.text)
-            responce_j['status_code'] = responce.status_code
-
-            return responce_j
-        except:
-            print("_____________________________ERROR_JSON_LOADS_______________________________")
-            print(responce.text)
-
-            return responce
-
-    def rest_put(self, app, route, data):
-        url = str(app.env.base_url) + str(route)
-        if data is None:
-            data = {}
-        if len(app.env.headers) > 1:
-            data = json.dumps(data)
-
-        responce = requests.request(
-            "PUT",
-            url,
-            data=data,
-            headers=app.env.headers,
-            cookies=app.env.cookies,
-            params=app.env.params)
-        responce_j = {}
-        try:
-
-            responce_j['data'] = json.loads(responce.text)
-
-        except:
-            print("_____________________________ERROR_JSON_LOADS_______________________________")
-            print(responce.text)
-
-        responce_j['status_code'] = responce.status_code
-
-        return responce_j
-
-    def rest_delete(self, app, route, data=None):
-        url = str(app.env.base_url) + str(route)
-        if data is None:
-            data = {}
-        if len(app.env.headers) > 1:
-            data = json.dumps(data)
-
-        responce = requests.request(
-            "DELETE",
-            url,
-            headers=app.env.headers,
-            cookies=app.env.cookies,
-            params=app.env.params)
-        try:
-            responce_j = {}
-            if type(responce) == dict:
-                responce_j = json.loads(responce.text)
-            responce_j['status_code'] = responce.status_code
-
-            return responce_j
-        except:
-            print("_____________________________ERROR_JSON_LOADS_______________________________")
-            print(responce.text)
+    def get_response_rest(self, app, tr_data, resp_type):
+        response = requests.request(method=resp_type, url=tr_data['url'], data=tr_data['data'], headers=app.env.headers,
+                                    cookies=app.env.cookies, params=app.env.params, verify=False)
+        return response

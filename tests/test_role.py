@@ -25,14 +25,14 @@ class TestRole:
         assert resp['status_code'] == 200
 
     def test_WHEN_delete_new_role_EXPECTED_status_code_200(self, app):
-        role_id = app.data_help.create_random_role_and_get_data(app)['id']
+        role_id = app.data_help.create_random_role_and_get_data(app)['data']['id']
         app.env.params['id'] = role_id
 
         resp = app.rest.rest_delete(app=app, route=app.route.del_role)
         assert resp['status_code'] == 200
 
     def test_WHEN_change_new_role_EXPECTED_status_code_200(self, app):
-        new_role_data = app.data_help.create_random_role_and_get_data(app)
+        new_role_data = app.data_help.create_random_role_and_get_data(app)['data']
         new_role_data['role'] = "test_role_" + app.string.get_random_string(10)
 
         resp = app.rest.rest_put(app, app.route.change_role, data=new_role_data)

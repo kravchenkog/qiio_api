@@ -38,7 +38,7 @@ class TestUser:
 
         # GET_CREATED_USER
         app.data_help.remove_parameters(app)
-        user_id = [x['id'] for x in app.rest.rest_get(app, route=app.route.list_users)['result'] if
+        user_id = [x['id'] for x in app.rest.rest_get(app, route=app.route.list_users)['data']['result'] if
                    x['email'] == data['email']]
 
         # DELETE USER

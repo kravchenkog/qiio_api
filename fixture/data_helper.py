@@ -64,7 +64,7 @@ class DataHelper:
         resp = app.rest.rest_post(app=app, data=user_data, route=app.route.new_user)
 
         self.remove_parameters(app)
-        user = [x for x in app.rest.rest_get(app, route=app.route.list_users)['result'] if
+        user = [x for x in app.rest.rest_get(app, route=app.route.list_users)['data']['result'] if
                 x['email'] == user_data['email']][0]
 
         return {'userdata': user, "password": password}
@@ -96,7 +96,7 @@ class DataHelper:
 
     def clean_test_users(self, app):
         users = app.rest.rest_get(app, route=app.route.list_users)
-        for us in users['result']:
+        for us in users['data']['result']:
             if 'test_user' in us['login']:
                 app.env.params['userId'] = us['id']
                 app.rest.rest_delete(app=app, route=app.route.del_user)
