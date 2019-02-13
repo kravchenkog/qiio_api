@@ -48,6 +48,10 @@ class Rest:
         if responce.status_code != 200:
             print('STATUS CODE = {}  \n/ TEXT = {}  \n/ URL = {}  \n/ PARAMS = {}  \n/ DATA = {}'
                   .format(responce.status_code, responce.text, url, str(app.env.params), str(data)))
+        elif responce.text == "":
+
+            responce_j = {'data': responce.text, 'status_code': responce.status_code}
+            return responce_j
         try:
 
             responce_j = json.loads(responce.text)
@@ -73,7 +77,7 @@ class Rest:
             data=data,
             headers=app.env.headers,
             cookies=app.env.cookies,
-            params= app.env.params)
+            params=app.env.params)
         responce_j = {}
         try:
 

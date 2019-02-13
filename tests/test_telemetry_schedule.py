@@ -88,7 +88,8 @@ class TestTelemetrySchedule():
             app.env.params['method'] = 'swupdate'
             app.env.params['deviceId'] = random.choice(device_list)['deviceId']
             data = {'payload': {"packageUri": "{0}", 'type': random.randint(1, 3)}}
-        app.env.params['time'] = int(app.string.get_random_start_end_dates_unix()['start_date'])
+        # app.env.params['time'] = int(app.string.get_random_start_end_dates_unix()['start_date']) #random time
+        app.env.params['time']  = int(app.string.get_current_unix_time())#current time
         resp = app.rest.rest_post(app, route=app.route.new_schedule, data=data)
 
         assert resp['status_code'] == 200

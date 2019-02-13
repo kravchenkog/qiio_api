@@ -112,5 +112,9 @@ class StringGeneratoHelper:
         random_year = random.randint(1971, 2018)
         start_date = datetime.date(random_year, random.randint(1, 12), random.randint(1, 28))
         end_year = datetime.date(random.randint(random_year, 2018), random.randint(1, 12), random.randint(1, 28))
-        v =  {'start_date': time.mktime(start_date.timetuple()), 'end_date': time.mktime(end_year.timetuple())}
-        return v
+
+        return {'start_date': time.mktime(start_date.timetuple()), 'end_date': time.mktime(end_year.timetuple())}
+
+    def get_current_unix_time(self):
+        unix_time = time.time()
+        return unix_time
