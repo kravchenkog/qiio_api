@@ -109,8 +109,8 @@ class StringGeneratoHelper:
         return username
 
     def get_random_start_end_dates_unix(self):
-        random_year = random.randint(1800, 2018)
+        random_year = random.randint(1971, 2018)
         start_date = datetime.date(random_year, random.randint(1, 12), random.randint(1, 28))
         end_year = datetime.date(random.randint(random_year, 2018), random.randint(1, 12), random.randint(1, 28))
-
-        return {'start_date': time.mktime(start_date.timetuple()), 'end_date': time.mktime(end_year.timetuple())}
+        v =  {'start_date': time.mktime(start_date.timetuple()), 'end_date': time.mktime(end_year.timetuple())}
+        return v
