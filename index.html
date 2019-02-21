@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <link href="assets/style.css" rel="stylesheet" type="text/css"/></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function find_all(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sort_column(elem) {
+    toggle_sort_states(elem);
+    var colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    var key;
+    if (elem.classList.contains('numeric')) {
+        key = key_num;
+    } else if (elem.classList.contains('result')) {
+        key = key_result;
+    } else {
+        key = key_alpha;
+    }
+    sort_table(elem, key(colIndex));
+}
+
+function show_all_extras() {
+    find_all('.col-result').forEach(show_extras);
+}
+
+function hide_all_extras() {
+    find_all('.col-result').forEach(hide_extras);
+}
+
+function show_extras(colresult_elem) {
+    var extras = colresult_elem.parentNode.nextElementSibling;
+    var expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.remove("collapsed");
+    expandcollapse.classList.remove("expander");
+    expandcollapse.classList.add("collapser");
+}
+
+function hide_extras(colresult_elem) {
+    var extras = colresult_elem.parentNode.nextElementSibling;
+    var expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.add("collapsed");
+    expandcollapse.classList.remove("collapser");
+    expandcollapse.classList.add("expander");
+}
+
+function show_filters() {
+    var filter_items = document.getElementsByClassName('filter');
+    for (var i = 0; i < filter_items.length; i++)
+        filter_items[i].hidden = false;
+}
+
+function add_collapse() {
+    // Add links for show/hide all
+    var resulttable = find('table#results-table');
+    var showhideall = document.createElement("p");
+    showhideall.innerHTML = '<a href="javascript:show_all_extras()">Show all details</a> / ' +
+                            '<a href="javascript:hide_all_extras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    find_all('.col-result').forEach(function(elem) {
+        var collapsed = get_query_parameter('collapsed') || 'Passed';
+        var extras = elem.parentNode.nextElementSibling;
+        var expandcollapse = document.createElement("span");
+        if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add("collapsed");
+            expandcollapse.classList.add("expander");
+        } else {
+            expandcollapse.classList.add("collapser");
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener("click", function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains("collapsed")) {
+                show_extras(event.currentTarget);
+            } else {
+                hide_extras(event.currentTarget);
+            }
+        });
+    })
+}
+
+function get_query_parameter(name) {
+    var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () {
+    reset_sort_headers();
+
+    add_collapse();
+
+    show_filters();
+
+    toggle_sort_states(find('.initial-sort'));
+
+    find_all('.sortable').forEach(function(elem) {
+        elem.addEventListener("click",
+                              function(event) {
+                                  sort_column(elem);
+                              }, false)
+    });
+
+};
+
+function sort_table(clicked, key_func) {
+    var rows = find_all('.results-table-row');
+    var reversed = !clicked.classList.contains('asc');
+    var sorted_rows = sort(rows, key_func, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    var thead = document.getElementById("results-table-head");
+    document.getElementById('results-table').remove();
+    var parent = document.createElement("table");
+    parent.id = "results-table";
+    parent.appendChild(thead);
+    sorted_rows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName("BODY")[0].appendChild(parent);
+}
+
+function sort(items, key_func, reversed) {
+    var sort_array = items.map(function(item, i) {
+        return [key_func(item), i];
+    });
+    var multiplier = reversed ? -1 : 1;
+
+    sort_array.sort(function(a, b) {
+        var key_a = a[0];
+        var key_b = b[0];
+        return multiplier * (key_a >= key_b ? 1 : -1);
+    });
+
+    return sort_array.map(function(item) {
+        var index = item[1];
+        return items[index];
+    });
+}
+
+function key_alpha(col_index) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[col_index].firstChild.data.toLowerCase();
+    };
+}
+
+function key_num(col_index) {
+    return function(elem) {
+        return parseFloat(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function key_result(col_index) {
+    return function(elem) {
+        var strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+                       'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function reset_sort_headers() {
+    find_all('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    find_all('.sortable').forEach(function(elem) {
+        var icon = document.createElement("div");
+        icon.className = "sort-icon";
+        icon.textContent = "vvv";
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove("desc", "active");
+        elem.classList.add("asc", "inactive");
+    });
+}
+
+function toggle_sort_states(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        reset_sort_headers();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function is_all_rows_hidden(value) {
+  return value.hidden == false;
+}
+
+function filter_table(elem) {
+    var outcome_att = "data-test-result";
+    var outcome = elem.getAttribute(outcome_att);
+    class_outcome = outcome + " results-table-row";
+    var outcome_rows = document.getElementsByClassName(class_outcome);
+
+    for(var i = 0; i < outcome_rows.length; i++){
+        outcome_rows[i].hidden = !elem.checked;
+    }
+
+    var rows = find_all('.results-table-row').filter(is_all_rows_hidden);
+    var all_rows_hidden = rows.length == 0 ? true : false;
+    var not_found_message = document.getElementById("not-found-message");
+    not_found_message.hidden = !all_rows_hidden;
+}
+</script>
+    <h1>index.html</h1>
+    <p>Report generated on 18-Feb-2019 at 14:59:07 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v1.20.0</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>Packages</td>
+        <td>{&apos;pytest&apos;: &apos;4.2.0&apos;, &apos;py&apos;: &apos;1.7.0&apos;, &apos;pluggy&apos;: &apos;0.8.1&apos;}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>Linux-4.15.0-45-generic-x86_64-with-Ubuntu-18.04-bionic</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{&apos;spec&apos;: &apos;1.1.0&apos;, &apos;metadata&apos;: &apos;1.8.0&apos;, &apos;html&apos;: &apos;1.20.0&apos;}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.6.7</td></tr></table>
+    <h2>Summary</h2>
+    <p>42 tests ran in 12.71 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="passed">1 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="failed">41 failed</span>, <input checked="true" class="filter" data-test-result="error" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="error">1 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable numeric" col="duration">Duration</th>
+          <th>Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="error results-table-row">
+        <tr>
+          <td class="col-result">Error</td>
+          <td class="col-name">tests/test_user.py::TestUser::test_WHEN_put_change_user_AND_data_proper_EXPECTED_response_code_200::teardown</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">tp = &lt;class &#x27;TypeError&#x27;&gt;, value = None, tb = None<br/><br/>    def reraise(tp, value, tb=None):<br/>        try:<br/>            if value is None:<br/>                value = tp()<br/>            if value.__traceback__ is not tb:<br/>                raise value.with_traceback(tb)<br/>&gt;           raise value<br/><br/>venv/lib/python3.6/site-packages/six.py:693: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>venv/lib/python3.6/site-packages/six.py:693: in reraise<br/>    raise value<br/>venv/lib/python3.6/site-packages/six.py:693: in reraise<br/>    raise value<br/>conftest.py:70: in finalizer_function<br/>    fixture.data_help.clean_test_users(fixture)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;fixture.data_helper.DataHelper object at 0x7f10d6cee8d0&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def clean_test_users(self, app):<br/>        users = app.rest.rest_get(app, route=app.route.list_users)<br/>&gt;       for us in users[&#x27;data&#x27;][&#x27;result&#x27;]:<br/><span class="error">E       TypeError: string indices must be integers</span><br/><br/>fixture/data_helper.py:99: TypeError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+--------------------------- Captured stdout teardown ---------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/ums/list-users  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_company.py::TestCompany::test_WHEN_get_company_EXPECTED_response_code_200</td>
+          <td class="col-duration">0.33</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_company.TestCompany object at 0x7f10d6d7f6d8&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_get_company_EXPECTED_response_code_200(self, app):<br/>        resp = app.rest.rest_get(app, app.route.company)<br/>&gt;       assert resp[&#x27;status_code&#x27;] == 200<br/><span class="error">E       assert 401 == 200</span><br/><br/>tests/test_company.py:11: AssertionError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/ums/company  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_company.py::TestCompany::test_WHEN_get_companies_EXPECTED_response_code_200</td>
+          <td class="col-duration">0.38</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_company.TestCompany object at 0x7f10d7a23b70&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_get_companies_EXPECTED_response_code_200(self, app):<br/>        resp = app.rest.rest_get(app, app.route.companies)<br/>&gt;       assert resp[&#x27;status_code&#x27;] == 200<br/><span class="error">E       assert 401 == 200</span><br/><br/>tests/test_company.py:16: AssertionError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/ums/companies  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_devices.py::TestDevices::test_WHEN_get_devices_EXPECTED_status_code_is_200</td>
+          <td class="col-duration">0.64</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_devices.TestDevices object at 0x7f10d6d066d8&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_get_devices_EXPECTED_status_code_is_200(self, app):<br/>        resp = app.rest.rest_get(app, route=app.route.dev_list)<br/>&gt;       assert resp[&#x27;status_code&#x27;] == 200<br/><span class="error">E       assert 401 == 200</span><br/><br/>tests/test_devices.py:8: AssertionError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_devices.py::TestDevices::test_WHEN_get_devices_EXPECTED_list_is_not_empty</td>
+          <td class="col-duration">0.25</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_devices.TestDevices object at 0x7f10d6497a90&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_get_devices_EXPECTED_list_is_not_empty(self, app):<br/>        resp = app.rest.rest_get(app, route=app.route.dev_list)<br/>&gt;       assert len(resp[&#x27;data&#x27;]) &gt; 0<br/><span class="error">E       AssertionError: assert 0 &gt; 0</span><br/><span class="error">E        +  where 0 = len(&#x27;&#x27;)</span><br/><br/>tests/test_devices.py:12: AssertionError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_devices.py::TestDevices::test_WHEN_change_device_twin_EXPECTED_response_code_200</td>
+          <td class="col-duration">0.30</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_devices.TestDevices object at 0x7f10d6432198&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_change_device_twin_EXPECTED_response_code_200(self, app):<br/>&gt;       device = random.choice(app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;])<br/><br/>tests/test_devices.py:15: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = &#x27;&#x27;<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_devices.py::TestDevices::test_WHEN_get_device_events_EXPECTED_response_code_200</td>
+          <td class="col-duration">0.29</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_devices.TestDevices object at 0x7f10d6465978&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_get_device_events_EXPECTED_response_code_200(self, app):<br/>&gt;       device = random.choice(app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;])<br/><br/>tests/test_devices.py:20: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = &#x27;&#x27;<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_firmware.py::TestFirmware::test_WHEN_get_firmware_EXPECTED_response_code_is_200[firmware]</td>
+          <td class="col-duration">0.39</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_firmware.TestFirmware object at 0x7f10d6d06f60&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, target = &#x27;firmware&#x27;<br/><br/>    def test_WHEN_get_firmware_EXPECTED_response_code_is_200(self, app, target):<br/>        app.env.params[&#x27;target&#x27;] = target<br/>        resp = app.rest.rest_get(app, route=app.route.list_firmware)<br/>&gt;       assert resp[&#x27;status_code&#x27;] == 200<br/><span class="error">E       assert 401 == 200</span><br/><br/>tests/test_firmware.py:13: AssertionError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-firmwares  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;, &#x27;target&#x27;: &#x27;firmware&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_firmware.py::TestFirmware::test_WHEN_get_firmware_EXPECTED_response_code_is_200[config]</td>
+          <td class="col-duration">0.25</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_firmware.TestFirmware object at 0x7f10d6438e48&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, target = &#x27;config&#x27;<br/><br/>    def test_WHEN_get_firmware_EXPECTED_response_code_is_200(self, app, target):<br/>        app.env.params[&#x27;target&#x27;] = target<br/>        resp = app.rest.rest_get(app, route=app.route.list_firmware)<br/>&gt;       assert resp[&#x27;status_code&#x27;] == 200<br/><span class="error">E       assert 401 == 200</span><br/><br/>tests/test_firmware.py:13: AssertionError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-firmwares  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;, &#x27;target&#x27;: &#x27;config&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_firmware.py::TestFirmware::test_WHEN_get_firmware_EXPECTED_response_code_is_200[delta]</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_firmware.TestFirmware object at 0x7f10d64653c8&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, target = &#x27;delta&#x27;<br/><br/>    def test_WHEN_get_firmware_EXPECTED_response_code_is_200(self, app, target):<br/>        app.env.params[&#x27;target&#x27;] = target<br/>        resp = app.rest.rest_get(app, route=app.route.list_firmware)<br/>&gt;       assert resp[&#x27;status_code&#x27;] == 200<br/><span class="error">E       assert 401 == 200</span><br/><br/>tests/test_firmware.py:13: AssertionError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-firmwares  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;, &#x27;target&#x27;: &#x27;delta&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_firmware.py::TestFirmware::test_WHEN_get_firmware_EXPECTED_response_code_is_200[package]</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_firmware.TestFirmware object at 0x7f10d6432860&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, target = &#x27;package&#x27;<br/><br/>    def test_WHEN_get_firmware_EXPECTED_response_code_is_200(self, app, target):<br/>        app.env.params[&#x27;target&#x27;] = target<br/>        resp = app.rest.rest_get(app, route=app.route.list_firmware)<br/>&gt;       assert resp[&#x27;status_code&#x27;] == 200<br/><span class="error">E       assert 401 == 200</span><br/><br/>tests/test_firmware.py:13: AssertionError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-firmwares  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;, &#x27;target&#x27;: &#x27;package&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_firmware.py::TestFirmware::test_WHEN_get_firmware_EXPECTED_response_code_is_200[linux]</td>
+          <td class="col-duration">0.25</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_firmware.TestFirmware object at 0x7f10d640f710&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, target = &#x27;linux&#x27;<br/><br/>    def test_WHEN_get_firmware_EXPECTED_response_code_is_200(self, app, target):<br/>        app.env.params[&#x27;target&#x27;] = target<br/>        resp = app.rest.rest_get(app, route=app.route.list_firmware)<br/>&gt;       assert resp[&#x27;status_code&#x27;] == 200<br/><span class="error">E       assert 401 == 200</span><br/><br/>tests/test_firmware.py:13: AssertionError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-firmwares  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;, &#x27;target&#x27;: &#x27;linux&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_initials.py::TestInitials::test_WHEN_get_initials_EXPECTED_response_code_200</td>
+          <td class="col-duration">0.25</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_initials.TestInitials object at 0x7f10d6457c50&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_get_initials_EXPECTED_response_code_200(self, app):<br/>        resp = app.rest.rest_get(app, route=app.route.list_init)<br/>&gt;       assert resp[&#x27;status_code&#x27;] == 200<br/><span class="error">E       assert 401 == 200</span><br/><br/>tests/test_initials.py:12: AssertionError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-initials  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_password.py::TestPassword::test_WHEN_reset_password_EXPECTED_respomse_code_200</td>
+          <td class="col-duration">0.25</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_password.TestPassword object at 0x7f10d6460438&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_reset_password_EXPECTED_respomse_code_200(self, app):<br/>&gt;       user = app.data_help.create_new_random_user_and_get_template_to_edit(app)[&#x27;userdata&#x27;]<br/><br/>tests/test_password.py:11: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>fixture/data_helper.py:60: in create_new_random_user_and_get_template_to_edit<br/>    device_id = random.choice(app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;])[&#x27;deviceId&#x27;]<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = &#x27;&#x27;<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_password.py::TestPassword::test_WHEN_send_password_EXPECTED_status_code_200</td>
+          <td class="col-duration">0.44</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_password.TestPassword object at 0x7f10d63f2a58&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_send_password_EXPECTED_status_code_200(self, app):<br/>&gt;       user_data = app.data_help.create_new_random_user_and_get_template_to_edit(app)<br/><br/>tests/test_password.py:17: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>fixture/data_helper.py:60: in create_new_random_user_and_get_template_to_edit<br/>    device_id = random.choice(app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;])[&#x27;deviceId&#x27;]<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = &#x27;&#x27;<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_role.py::TestRole::test_WHEN_get_role_EXPECTED_response_code_200</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_role.TestRole object at 0x7f10d6428438&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_get_role_EXPECTED_response_code_200(self, app):<br/>        # app.env.params[&#x27;type&#x27;] = &#x27;all&#x27;<br/>        resp = app.rest.rest_get(app, route=app.route.get_roles)<br/>&gt;       assert resp[&#x27;status_code&#x27;] == 200<br/><span class="error">E       assert 401 == 200</span><br/><br/>tests/test_role.py:13: AssertionError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/ums/get-roles  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_role.py::TestRole::test_WHEN_post_new_role_EXPECTED_response_code_200[Admin]</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_role.TestRole object at 0x7f10d6414b70&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, template = &#x27;Admin&#x27;<br/><br/>    def test_WHEN_post_new_role_EXPECTED_response_code_200(self, app, template):<br/>        template_value = template<br/>&gt;       random_role = random.choice([x for x in app.rest.rest_get(app, route=app.route.get_roles)[&#x27;data&#x27;]<br/>                       if x[&#x27;role&#x27;] == template_value])<br/><br/>tests/test_role.py:17: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = []<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/ums/get-roles  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_role.py::TestRole::test_WHEN_post_new_role_EXPECTED_response_code_200[SuperAdmin]</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_role.TestRole object at 0x7f10d6425400&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, template = &#x27;SuperAdmin&#x27;<br/><br/>    def test_WHEN_post_new_role_EXPECTED_response_code_200(self, app, template):<br/>        template_value = template<br/>&gt;       random_role = random.choice([x for x in app.rest.rest_get(app, route=app.route.get_roles)[&#x27;data&#x27;]<br/>                       if x[&#x27;role&#x27;] == template_value])<br/><br/>tests/test_role.py:17: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = []<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/ums/get-roles  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_role.py::TestRole::test_WHEN_post_new_role_EXPECTED_response_code_200[User]</td>
+          <td class="col-duration">0.38</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_role.TestRole object at 0x7f10d63a1240&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, template = &#x27;User&#x27;<br/><br/>    def test_WHEN_post_new_role_EXPECTED_response_code_200(self, app, template):<br/>        template_value = template<br/>&gt;       random_role = random.choice([x for x in app.rest.rest_get(app, route=app.route.get_roles)[&#x27;data&#x27;]<br/>                       if x[&#x27;role&#x27;] == template_value])<br/><br/>tests/test_role.py:17: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = []<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/ums/get-roles  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_role.py::TestRole::test_WHEN_delete_new_role_EXPECTED_status_code_200</td>
+          <td class="col-duration">0.26</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_role.TestRole object at 0x7f10d6421710&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_delete_new_role_EXPECTED_status_code_200(self, app):<br/>&gt;       role_id = app.data_help.create_random_role_and_get_data(app)[&#x27;data&#x27;][&#x27;id&#x27;]<br/><br/>tests/test_role.py:28: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>fixture/data_helper.py:73: in create_random_role_and_get_data<br/>    random_role = random.choice([x for x in app.rest.rest_get(app, route=app.route.get_roles)[&#x27;data&#x27;]<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = []<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/ums/get-roles  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_role.py::TestRole::test_WHEN_change_new_role_EXPECTED_status_code_200</td>
+          <td class="col-duration">0.25</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_role.TestRole object at 0x7f10d63f9588&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_change_new_role_EXPECTED_status_code_200(self, app):<br/>&gt;       new_role_data = app.data_help.create_random_role_and_get_data(app)[&#x27;data&#x27;]<br/><br/>tests/test_role.py:35: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>fixture/data_helper.py:73: in create_random_role_and_get_data<br/>    random_role = random.choice([x for x in app.rest.rest_get(app, route=app.route.get_roles)[&#x27;data&#x27;]<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = []<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/ums/get-roles  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_telemetry_schedule.py::TestTelemetrySchedule::test_WHEN_get_real_telemetry_EXPECTED_status_code_is_200[heat]</td>
+          <td class="col-duration">0.25</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_telemetry_schedule.TestTelemetrySchedule object at 0x7f10d637a5c0&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, telemetry = &#x27;heat&#x27;<br/><br/>    def test_WHEN_get_real_telemetry_EXPECTED_status_code_is_200(self, app, telemetry):<br/>&gt;       device_id = random.choice(app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;])<br/><br/>tests/test_telemetry_schedule.py:17: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = &#x27;&#x27;<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_telemetry_schedule.py::TestTelemetrySchedule::test_WHEN_get_real_telemetry_EXPECTED_status_code_is_200[surface]</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_telemetry_schedule.TestTelemetrySchedule object at 0x7f10d640c390&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, telemetry = &#x27;surface&#x27;<br/><br/>    def test_WHEN_get_real_telemetry_EXPECTED_status_code_is_200(self, app, telemetry):<br/>&gt;       device_id = random.choice(app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;])<br/><br/>tests/test_telemetry_schedule.py:17: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = &#x27;&#x27;<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_telemetry_schedule.py::TestTelemetrySchedule::test_WHEN_get_real_telemetry_EXPECTED_status_code_is_200[ambient]</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_telemetry_schedule.TestTelemetrySchedule object at 0x7f10d636fe48&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, telemetry = &#x27;ambient&#x27;<br/><br/>    def test_WHEN_get_real_telemetry_EXPECTED_status_code_is_200(self, app, telemetry):<br/>&gt;       device_id = random.choice(app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;])<br/><br/>tests/test_telemetry_schedule.py:17: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = &#x27;&#x27;<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_telemetry_schedule.py::TestTelemetrySchedule::test_WHEN_get_real_telemetry_EXPECTED_status_code_is_200[humidity]</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_telemetry_schedule.TestTelemetrySchedule object at 0x7f10d63831d0&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, telemetry = &#x27;humidity&#x27;<br/><br/>    def test_WHEN_get_real_telemetry_EXPECTED_status_code_is_200(self, app, telemetry):<br/>&gt;       device_id = random.choice(app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;])<br/><br/>tests/test_telemetry_schedule.py:17: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = &#x27;&#x27;<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_telemetry_schedule.py::TestTelemetrySchedule::test_WHEN_get_history_telemetry_EXPECTED_status_code_is_200[heat]</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_telemetry_schedule.TestTelemetrySchedule object at 0x7f10d6373048&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, telemetry = &#x27;heat&#x27;<br/><br/>    def test_WHEN_get_history_telemetry_EXPECTED_status_code_is_200(self, app, telemetry):<br/>        dates = app.string.get_random_start_end_dates_unix()<br/>&gt;       device = random.choice(app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;])<br/><br/>tests/test_telemetry_schedule.py:26: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = &#x27;&#x27;<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_telemetry_schedule.py::TestTelemetrySchedule::test_WHEN_get_history_telemetry_EXPECTED_status_code_is_200[surface]</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_telemetry_schedule.TestTelemetrySchedule object at 0x7f10d630bba8&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, telemetry = &#x27;surface&#x27;<br/><br/>    def test_WHEN_get_history_telemetry_EXPECTED_status_code_is_200(self, app, telemetry):<br/>        dates = app.string.get_random_start_end_dates_unix()<br/>&gt;       device = random.choice(app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;])<br/><br/>tests/test_telemetry_schedule.py:26: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = &#x27;&#x27;<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_telemetry_schedule.py::TestTelemetrySchedule::test_WHEN_get_history_telemetry_EXPECTED_status_code_is_200[ambient]</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_telemetry_schedule.TestTelemetrySchedule object at 0x7f10d6497898&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, telemetry = &#x27;ambient&#x27;<br/><br/>    def test_WHEN_get_history_telemetry_EXPECTED_status_code_is_200(self, app, telemetry):<br/>        dates = app.string.get_random_start_end_dates_unix()<br/>&gt;       device = random.choice(app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;])<br/><br/>tests/test_telemetry_schedule.py:26: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = &#x27;&#x27;<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_telemetry_schedule.py::TestTelemetrySchedule::test_WHEN_get_history_telemetry_EXPECTED_status_code_is_200[humidity]</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_telemetry_schedule.TestTelemetrySchedule object at 0x7f10d638cc50&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, telemetry = &#x27;humidity&#x27;<br/><br/>    def test_WHEN_get_history_telemetry_EXPECTED_status_code_is_200(self, app, telemetry):<br/>        dates = app.string.get_random_start_end_dates_unix()<br/>&gt;       device = random.choice(app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;])<br/><br/>tests/test_telemetry_schedule.py:26: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = &#x27;&#x27;<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_telemetry_schedule.py::TestTelemetrySchedule::test_WHEN_get_list_cellular_EXPECTED_response_code_400</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_telemetry_schedule.TestTelemetrySchedule object at 0x7f10d6400908&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_get_list_cellular_EXPECTED_response_code_400(self, app):<br/>        app.env.params[&#x27;page&#x27;] = random.randint(1, 50)<br/>        app.env.params[&#x27;number&#x27;] = random.randint(1, 50)<br/>        resp = app.rest.rest_get(app, route=app.route.list_cell)<br/>&gt;       assert resp[&#x27;status_code&#x27;] == 400<br/><span class="error">E       assert 401 == 400</span><br/><br/>tests/test_telemetry_schedule.py:40: AssertionError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/cms/list-cellular  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;, &#x27;page&#x27;: 44, &#x27;number&#x27;: 39}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_telemetry_schedule.py::TestTelemetrySchedule::test_WHEN_get_cellular_profile_EXPECTED_response_code_400</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_telemetry_schedule.TestTelemetrySchedule object at 0x7f10d638e550&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_get_cellular_profile_EXPECTED_response_code_400(self, app):<br/>        resp = app.rest.rest_get(app, route=app.route.list_cell_prof)<br/>&gt;       assert resp[&#x27;status_code&#x27;] == 400<br/><span class="error">E       assert 401 == 400</span><br/><br/>tests/test_telemetry_schedule.py:44: AssertionError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/cms/list-cellular-profiles  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_telemetry_schedule.py::TestTelemetrySchedule::test_WHEN_get_list_enrollments_EXPECTED_respose_code_400</td>
+          <td class="col-duration">0.25</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_telemetry_schedule.TestTelemetrySchedule object at 0x7f10d63dd3c8&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_get_list_enrollments_EXPECTED_respose_code_400(self, app):<br/>        app.env.params[&#x27;page&#x27;] = random.randint(1, 50)<br/>        app.env.params[&#x27;number&#x27;] = random.randint(1, 50)<br/>    <br/>        resp = app.rest.rest_get(app, route=app.route.list_enroll)<br/>&gt;       assert resp[&#x27;status_code&#x27;] == 400<br/><span class="error">E       assert 401 == 400</span><br/><br/>tests/test_telemetry_schedule.py:51: AssertionError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/cms/list-enrollments  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;, &#x27;page&#x27;: 8, &#x27;number&#x27;: 13}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_telemetry_schedule.py::TestTelemetrySchedule::test_WHEN_post_schedule_EXPECTED_response_code_200[firmware]</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_telemetry_schedule.TestTelemetrySchedule object at 0x7f10d63bb1d0&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, target = &#x27;firmware&#x27;<br/><br/>    def test_WHEN_post_schedule_EXPECTED_response_code_200(self, app, target):<br/>        app.env.params[&#x27;target&#x27;] = target<br/>        device_list = app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;]<br/>        data = {}<br/>    <br/>        if target != &#x27;delta&#x27;:<br/>            for d in device_list:<br/>                self.device_id = d[&#x27;deviceId&#x27;]<br/>                app.env.params[&#x27;deviceId&#x27;] = self.device_id<br/>                firmware = app.rest.rest_get(app, route=app.route.list_firmware)<br/>                if len(firmware[&#x27;data&#x27;]) &gt; 0:<br/>                    break<br/>    <br/>&gt;           if len(firmware[&#x27;data&#x27;]) == 0:<br/><span class="error">E           UnboundLocalError: local variable &#x27;firmware&#x27; referenced before assignment</span><br/><br/>tests/test_telemetry_schedule.py:66: UnboundLocalError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;, &#x27;target&#x27;: &#x27;firmware&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_telemetry_schedule.py::TestTelemetrySchedule::test_WHEN_post_schedule_EXPECTED_response_code_200[config]</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_telemetry_schedule.TestTelemetrySchedule object at 0x7f10d63cb9b0&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, target = &#x27;config&#x27;<br/><br/>    def test_WHEN_post_schedule_EXPECTED_response_code_200(self, app, target):<br/>        app.env.params[&#x27;target&#x27;] = target<br/>        device_list = app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;]<br/>        data = {}<br/>    <br/>        if target != &#x27;delta&#x27;:<br/>            for d in device_list:<br/>                self.device_id = d[&#x27;deviceId&#x27;]<br/>                app.env.params[&#x27;deviceId&#x27;] = self.device_id<br/>                firmware = app.rest.rest_get(app, route=app.route.list_firmware)<br/>                if len(firmware[&#x27;data&#x27;]) &gt; 0:<br/>                    break<br/>    <br/>&gt;           if len(firmware[&#x27;data&#x27;]) == 0:<br/><span class="error">E           UnboundLocalError: local variable &#x27;firmware&#x27; referenced before assignment</span><br/><br/>tests/test_telemetry_schedule.py:66: UnboundLocalError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;, &#x27;target&#x27;: &#x27;config&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_telemetry_schedule.py::TestTelemetrySchedule::test_WHEN_post_schedule_EXPECTED_response_code_200[delta]</td>
+          <td class="col-duration">0.25</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_telemetry_schedule.TestTelemetrySchedule object at 0x7f10d63fe8d0&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, target = &#x27;delta&#x27;<br/><br/>    def test_WHEN_post_schedule_EXPECTED_response_code_200(self, app, target):<br/>        app.env.params[&#x27;target&#x27;] = target<br/>        device_list = app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;]<br/>        data = {}<br/>    <br/>        if target != &#x27;delta&#x27;:<br/>            for d in device_list:<br/>                self.device_id = d[&#x27;deviceId&#x27;]<br/>                app.env.params[&#x27;deviceId&#x27;] = self.device_id<br/>                firmware = app.rest.rest_get(app, route=app.route.list_firmware)<br/>                if len(firmware[&#x27;data&#x27;]) &gt; 0:<br/>                    break<br/>    <br/>            if len(firmware[&#x27;data&#x27;]) == 0:<br/>                print(&quot;TEST IS NOT COMPLETED \n firmware: &quot; + str(firmware[&#x27;data&#x27;]))<br/>                return<br/>    <br/>        if target in [&#x27;firmware&#x27;, &#x27;config&#x27;, &#x27;package&#x27;]:<br/>    <br/>            app.env.params[&#x27;deviceId&#x27;] = self.device_id<br/>            app.env.params[&#x27;method&#x27;] = &quot;downloadFirmware&quot;<br/>            app.env.params[&#x27;sourceUrl&#x27;] = random.choice(firmware[&#x27;data&#x27;])<br/>            data = {&#x27;payload&#x27;: &#x27;{&quot;packageUri&quot;:&quot;{0}&quot;}&#x27;}<br/>    <br/>        elif target == &#x27;delta&#x27;:<br/>    <br/>            app.env.params[&#x27;method&#x27;] = &quot;updateBeerstationText&quot;<br/>&gt;           app.env.params[&#x27;deviceId&#x27;] = random.choice(device_list)[&#x27;deviceId&#x27;]<br/><br/>tests/test_telemetry_schedule.py:80: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = &#x27;&#x27;<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;, &#x27;target&#x27;: &#x27;delta&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_telemetry_schedule.py::TestTelemetrySchedule::test_WHEN_post_schedule_EXPECTED_response_code_200[package]</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_telemetry_schedule.TestTelemetrySchedule object at 0x7f10d63780f0&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, target = &#x27;package&#x27;<br/><br/>    def test_WHEN_post_schedule_EXPECTED_response_code_200(self, app, target):<br/>        app.env.params[&#x27;target&#x27;] = target<br/>        device_list = app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;]<br/>        data = {}<br/>    <br/>        if target != &#x27;delta&#x27;:<br/>            for d in device_list:<br/>                self.device_id = d[&#x27;deviceId&#x27;]<br/>                app.env.params[&#x27;deviceId&#x27;] = self.device_id<br/>                firmware = app.rest.rest_get(app, route=app.route.list_firmware)<br/>                if len(firmware[&#x27;data&#x27;]) &gt; 0:<br/>                    break<br/>    <br/>&gt;           if len(firmware[&#x27;data&#x27;]) == 0:<br/><span class="error">E           UnboundLocalError: local variable &#x27;firmware&#x27; referenced before assignment</span><br/><br/>tests/test_telemetry_schedule.py:66: UnboundLocalError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;, &#x27;target&#x27;: &#x27;package&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_telemetry_schedule.py::TestTelemetrySchedule::test_WHEN_post_schedule_EXPECTED_response_code_200[linux]</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_telemetry_schedule.TestTelemetrySchedule object at 0x7f10d63c5a20&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;, target = &#x27;linux&#x27;<br/><br/>    def test_WHEN_post_schedule_EXPECTED_response_code_200(self, app, target):<br/>        app.env.params[&#x27;target&#x27;] = target<br/>        device_list = app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;]<br/>        data = {}<br/>    <br/>        if target != &#x27;delta&#x27;:<br/>            for d in device_list:<br/>                self.device_id = d[&#x27;deviceId&#x27;]<br/>                app.env.params[&#x27;deviceId&#x27;] = self.device_id<br/>                firmware = app.rest.rest_get(app, route=app.route.list_firmware)<br/>                if len(firmware[&#x27;data&#x27;]) &gt; 0:<br/>                    break<br/>    <br/>&gt;           if len(firmware[&#x27;data&#x27;]) == 0:<br/><span class="error">E           UnboundLocalError: local variable &#x27;firmware&#x27; referenced before assignment</span><br/><br/>tests/test_telemetry_schedule.py:66: UnboundLocalError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;, &#x27;target&#x27;: &#x27;linux&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_user.py::TestUser::test_WHEN_get_user_EXPECTED_status_code_200</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_user.TestUser object at 0x7f10d63c0dd8&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_get_user_EXPECTED_status_code_200(self, app):<br/>        resp = app.rest.rest_get(app, route=app.route.user)<br/>&gt;       assert resp[&#x27;status_code&#x27;] == 200<br/><span class="error">E       assert 401 == 200</span><br/><br/>tests/test_user.py:15: AssertionError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/ums/user  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_user.py::TestUser::test_WHEN_get_list_users_EXPECTED_status_code_200</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_user.TestUser object at 0x7f10d63b4dd8&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_get_list_users_EXPECTED_status_code_200(self, app):<br/>        app.env.params[&#x27;number&#x27;] = random.randint(0, 100)<br/>        resp = app.rest.rest_get(app, route=app.route.list_users)<br/>&gt;       assert resp[&#x27;status_code&#x27;] == 200<br/><span class="error">E       assert 401 == 200</span><br/><br/>tests/test_user.py:20: AssertionError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/ums/list-users  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;, &#x27;number&#x27;: 66}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_user.py::TestUser::test_WHEN_new_user_AND_data_is_proper_EXPECTED_response_code_200</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_user.TestUser object at 0x7f10d63d5908&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_new_user_AND_data_is_proper_EXPECTED_response_code_200(self, app):<br/>&gt;       device_id = random.choice(app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;])[&#x27;deviceId&#x27;]<br/><br/>tests/test_user.py:23: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = &#x27;&#x27;<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_user.py::TestUser::test_WHEN_delete_user_EXPECTED_response_code_is_200</td>
+          <td class="col-duration">0.25</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_user.TestUser object at 0x7f10d63c7128&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_delete_user_EXPECTED_response_code_is_200(self, app):<br/>        # CREATE USER<br/>&gt;       device_id = random.choice(app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;])[&#x27;deviceId&#x27;]<br/><br/>tests/test_user.py:33: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = &#x27;&#x27;<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">tests/test_user.py::TestUser::test_WHEN_put_change_user_AND_data_proper_EXPECTED_response_code_200</td>
+          <td class="col-duration">0.24</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_user.TestUser object at 0x7f10d63b6278&gt;, app = &lt;fixture.app_manager.AppManager object at 0x7f10d6cee668&gt;<br/><br/>    def test_WHEN_put_change_user_AND_data_proper_EXPECTED_response_code_200(self, app):<br/>&gt;       user = app.data_help.create_new_random_user_and_get_template_to_edit(app)<br/><br/>tests/test_user.py:50: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>fixture/data_helper.py:60: in create_new_random_user_and_get_template_to_edit<br/>    device_id = random.choice(app.rest.rest_get(app, route=app.route.dev_list)[&#x27;data&#x27;])[&#x27;deviceId&#x27;]<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;random.Random object at 0x130fcf8&gt;, seq = &#x27;&#x27;<br/><br/>    def choice(self, seq):<br/>        &quot;&quot;&quot;Choose a random element from a non-empty sequence.&quot;&quot;&quot;<br/>        try:<br/>            i = self._randbelow(len(seq))<br/>        except ValueError:<br/>&gt;           raise IndexError(&#x27;Cannot choose from an empty sequence&#x27;) from None<br/><span class="error">E           IndexError: Cannot choose from an empty sequence</span><br/><br/>/usr/lib/python3.6/random.py:260: IndexError<br/>----------------------------- Captured stdout call -----------------------------<br/>STATUS CODE = 401  
+/ TEXT =   
+/ URL = https://api-test.qiio.cloud/api/dms/list-devices  
+/ PARAMS = {&#x27;url&#x27;: &#x27;goms-test.qiio.cloud&#x27;}  
+/ DATA = {}
+</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_telemetry_schedule.py::TestTelemetrySchedule::test_WHEN_delete_schedule_EXPECTED_reponse_code_is_200</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="empty log">No log output captured.</div></td></tr></tbody></table></body></html>

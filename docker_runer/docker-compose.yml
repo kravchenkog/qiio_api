@@ -1,0 +1,16 @@
+
+version: "3"
+
+services:
+
+  test_build:
+    build: ./pytest_dockerfile
+    volumes:
+      - ./qiio_api:/qiio_api/out
+
+  webserver:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./qiio_api:/usr/share/nginx/html
