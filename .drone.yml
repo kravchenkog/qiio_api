@@ -1,9 +1,6 @@
-kind: pipeline
-name: default
-
-steps:
-- name: test
-  image: python:3.5
-  commands:
-  - pip install -r requirements.txt
-  - pytest tests
+pipeline:
+  build:
+    image: python:3.6
+    commands:
+      - pip install -r requirements.txt
+      - pytest tests
