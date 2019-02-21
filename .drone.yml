@@ -1,0 +1,9 @@
+
+version: "3"
+
+services:
+
+  test_build:
+    build: ./docker_runer/pytest_dockerfile
+    volumes:
+      - ./qiio_api:/qiio_api/out
