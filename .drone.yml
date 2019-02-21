@@ -1,3 +1,6 @@
+kind: pipeline
+name: default
+
 build:
   image: python:3.5.1
   commands:
