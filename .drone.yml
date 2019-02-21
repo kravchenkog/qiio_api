@@ -1,5 +1,5 @@
 build:
-  image: ubuntu:latest
+  image: python:3.5.1
   commands:
     - pip install -r requirements.txt
-    - pytest . --doctest-modules --spec --html=out/index.html
+    - pytest .
