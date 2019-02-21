@@ -1,8 +1,10 @@
-build:
-  image: python:$$PYTHON_VERSION
-  commands:
-    - python setup.py test
+pipeline:
+  build:
+    image: python:${PYTHON_VERSION}
+    commands:
+      - pip install -r requirements.txt
+      - pytest tests
 
 matrix:
   PYTHON_VERSION:
-    - 2.7
+    - 3.6
