@@ -1,6 +1,6 @@
 pipeline:
   build:
-    image: python:3.6
+    image: python:3.6.1
     commands:
       - pip install -r requirements.txt
       - pytest tests
